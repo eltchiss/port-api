@@ -1,24 +1,25 @@
 /*
-Le app.js reste le plus simple possible.
-On initialise ici la connexion à MongoDB.
-On utilise le package CORS installé précédemment en acceptant toutes les origines et en exposant le header "Authorization"
-(pour récupérer le token d'authentification côté client)
-On déclare notre route principale avec pour url de base "/".
-On ajoute un retour en cas de requête sur une route inexistante (404).
+App.js : point d’entrée de l’application Express.
+- Initialise la connexion MongoDB
+- Active CORS et les middlewares essentiels
+- Monte les routes de l’API (users, catways)
+- Fournit une route d’accueil "/" simple (message JSON temporaire)
+- Gère les erreurs 404
 */
 
-const express      = require('express');
+const express = require('express');
 const cookieParser = require('cookie-parser');
-const logger       = require('morgan');
-const cors         = require('cors');
+const logger = require('morgan');
+const cors = require('cors');
 
-const indexRouter = require('./routes/index');
-const mongodb     = require('./db/mongo');
+const mongodb = require('./db/mongo');
 
+// Connexion à MongoDB
 mongodb.initClientDbConnection();
 
 const app = express();
 
+// Middlewares globaux
 app.use(cors({
   exposedHeaders: ['Authorization'],
   origin: '*',
@@ -28,10 +29,24 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-app.use('/', indexRouter);
+// --- Import des routes ---
+const indexRouter = require('./routes/index');    // Page d’accueil ou info API
+const userRouter = require('./routes/users');     // Routes Users
+const catwayRouter = require('./routes/catway'); // Routes Catways
 
-app.use(function(req, res, next) {
-  res.status(404).json({ name: 'API', version: '1.0', status: 404, message: 'not_found'});
+// --- Déclaration des routes ---
+app.use('/', indexRouter);
+app.use('/users', userRouter);
+app.use('/catways', catwayRouter);
+
+// --- Gestion des routes inexistantes ---
+app.use((req, res) => {
+  res.status(404).json({
+    name: 'API Capitainerie',
+    version: '1.0',
+    status: 404,
+    message: 'Route non trouvée',
+  });
 });
 
 module.exports = app;
