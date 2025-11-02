@@ -122,4 +122,3 @@ exports.authenticate = async (req, res, next) => {
         return res.status(501).json(error);
     }
 };
-
