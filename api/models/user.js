@@ -4,15 +4,13 @@ const Schema = mongoose.Schema;
 const bcrypt = require('bcrypt');
 
 const User = new Schema({
-    name: {
+    username: {
         type: String,
         trim: true,
-        required: [true, 'Le nom est requis']
+        required: [true, 'Le nom est requis'],
+        unique: true
     },
-    firstname: {
-        type: String,
-        trim: true
-    },
+
     email: {
         type: String,
         trim: true,
@@ -22,7 +20,8 @@ const User = new Schema({
     },
     password: {
         type: String,
-        trim: true
+        trim: true,
+        required: [true, 'Le mot de passe est requis']
     },
 }, { // ajoute 2 champs au document createdAt et updatedAt
     timestamps: true
