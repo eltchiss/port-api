@@ -4,24 +4,26 @@ const Catway = require('../models/catways');
 exports.getAll = async (req, res) => {
   try {
     const catways = await Catway.find();
-    res.json(catways);
+    res.status(200).json(catways);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Obtenir un catway par ID
+// Obtenir un catway par son numéro (catwayNumber)
 exports.getById = async (req, res) => {
   try {
-    const catway = await Catway.findById(req.params.id);
-    if (!catway) return res.status(404).json({ message: 'Catway non trouvé' });
-    res.json(catway);
+    const catway = await Catway.findOne({ catwayNumber: req.params.id });
+    if (!catway) {
+      return res.status(404).json({ message: 'Catway non trouvé' });
+    }
+    res.status(200).json(catway);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Ajouter un catway
+// Créer un nouveau catway
 exports.add = async (req, res) => {
   try {
     const { catwayNumber, catwayType, catwayState } = req.body;
@@ -41,20 +43,23 @@ exports.add = async (req, res) => {
   }
 };
 
-// Modifier uniquement l’état d’un catway
+// Modifier uniquement l’état d’un catway (catwayState)
 exports.updateState = async (req, res) => {
   try {
     const { catwayState } = req.body;
 
-    const updated = await Catway.findByIdAndUpdate(
-      req.params.id,
+    // On ne modifie que l’état
+    const updated = await Catway.findOneAndUpdate(
+      { catwayNumber: req.params.id },
       { catwayState },
       { new: true }
     );
 
-    if (!updated) return res.status(404).json({ message: 'Catway non trouvé' });
+    if (!updated) {
+      return res.status(404).json({ message: 'Catway non trouvé' });
+    }
 
-    res.json(updated);
+    res.status(200).json(updated);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -63,10 +68,13 @@ exports.updateState = async (req, res) => {
 // Supprimer un catway
 exports.delete = async (req, res) => {
   try {
-    const deleted = await Catway.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Catway non trouvé' });
+    const deleted = await Catway.findOneAndDelete({ catwayNumber: req.params.id });
 
-    res.json({ message: 'Catway supprimé avec succès.' });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Catway non trouvé' });
+    }
+
+    res.status(200).json({ message: 'Catway supprimé avec succès.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

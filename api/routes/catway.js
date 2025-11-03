@@ -13,10 +13,10 @@ router.get('/', private.checkJWT, service.getAll);
 router.get('/:id', private.checkJWT, service.getById);
 
 // Ajouter un nouveau catway
-router.put('/add', private.checkJWT, service.add);
+router.post('/', private.checkJWT, service.add);
 
 // Modifier l’état d’un catway (uniquement catwayState)
-router.patch('/:id', private.checkJWT, service.updateState);
+router.put('/:id', private.checkJWT, service.updateState);
 
 // Supprimer un catway
 router.delete('/:id', private.checkJWT, service.delete);
@@ -33,12 +33,13 @@ router.get('/:id/reservations', private.checkJWT, reservationService.getAllByCat
 router.get('/:id/reservations/:reservationId', private.checkJWT, reservationService.getById);
 
 // Créer une réservation
-router.put('/:id/reservations/add', private.checkJWT, reservationService.add);
+router.post('/:id/reservations', private.checkJWT, reservationService.add);
 
 // Modifier une réservation
-router.patch('/:id/reservations/:reservationId', private.checkJWT, reservationService.update);
+router.put('/:id/reservations/:reservationId', private.checkJWT, reservationService.update);
 
 // Supprimer une réservation
 router.delete('/:id/reservations/:reservationId', private.checkJWT, reservationService.delete);
+
 
 module.exports = router;
