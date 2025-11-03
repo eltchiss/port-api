@@ -1,55 +1,49 @@
 const express = require('express');
 const router = express.Router();
-// 🛑 Importez le middleware de protection JWT
-const private = require('../middlewares/private'); 
+const jwt = require('jsonwebtoken');
 
-// Page d'accueil (Non protégée)
-// Elle vérifie si l'utilisateur est déjà connecté via un token (si le middleware est appliqué avant)
+const SECRET = process.env.SECRET_KEY || 'superSecretKey';
+
+// page d'accueil
 router.get('/', (req, res) => {
-    // Si le token est valide, req.decoded est rempli. Sinon, il est null ou undefined.
-    // L'index.ejs doit gérer l'affichage du formulaire ou d'un lien vers le tableau de bord
-    res.render('index', { 
-        title: 'Accueil - Capitainerie',
-        user: req.decoded ? req.decoded.user : null 
-    });
+  res.render('index', { error: null });
 });
 
-// ===================================
-// Pages Protégées (Nécessite un JWT valide)
-// ===================================
+// Middleware local pour vérifier token cookie et injecter req.user
+function checkTokenCookie(req, res, next) {
+  const token = req.cookies && req.cookies.token;
+  if (!token) {
+    return res.redirect('/');
+  }
 
-// Tableau de bord
-router.get('/dashboard', private.checkJWT, (req, res) => {
-    // Le middleware private.checkJWT garantit que l'utilisateur est authentifié et que req.decoded existe.
-    res.render('dashboard', {
-        title: 'Tableau de Bord',
-        user: req.decoded.user, // Information utilisateur extraite du Token
-        date: new Date().toLocaleDateString('fr-FR'),
-    });
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    // token structure : { user: { ... }, iat, exp }
+    req.user = decoded.user || decoded;
+    next();
+  } catch (err) {
+    console.error('JWT invalide :', err.message);
+    return res.redirect('/');
+  }
+}
+
+// dashboard protégé
+router.get('/dashboard', checkTokenCookie, async (req, res) => {
+  // Si tu veux récupérer des réservations, fais-le ici via un service
+  const today = new Date().toLocaleDateString('fr-FR');
+
+  // req.user contient { _id, username, email } si tu as respecté le payload
+  res.render('dashboard', {
+    user: req.user,
+    date: today,
+    reservations: [] // remplacer par les réservations réelles via service
+  });
 });
 
-// Pages CRUD Catways
-router.get('/catways', private.checkJWT, (req, res) => {
-    res.render('catways', { 
-        title: 'Gestion des Catways',
-        user: req.decoded.user 
-    });
-});
-
-// Pages CRUD Réservations
-router.get('/reservations', private.checkJWT, (req, res) => {
-    res.render('reservations', { 
-        title: 'Gestion des Réservations',
-        user: req.decoded.user 
-    });
-});
-
-// Pages CRUD Utilisateurs
-router.get('/users', private.checkJWT, (req, res) => {
-    res.render('users', { 
-        title: 'Gestion des Utilisateurs',
-        user: req.decoded.user 
-    });
+// déconnexion : supprime le cookie 'token'
+router.get('/logout', (req, res) => {
+  res.clearCookie('token');
+  res.redirect('/');
 });
 
 module.exports = router;

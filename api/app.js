@@ -1,59 +1,73 @@
-/*
-App.js : point d’entrée de l’application Express.
-- Initialise la connexion MongoDB
-- Active CORS et les middlewares essentiels
-- Monte les routes de l’API (users, catways)
-- Fournit les pages front-end via EJS
-- Gère les erreurs 404
-*/
-
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const cors = require('cors');
 const path = require('path');
-
 const mongodb = require('./db/mongo');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('./models/user'); // <-- ton modèle utilisateur
 
-// Connexion à MongoDB
 mongodb.initClientDbConnection();
 
 const app = express();
 
-// --- Middlewares globaux ---
-app.use(cors({
-  exposedHeaders: ['Authorization'],
-  origin: '*',
-}));
+app.use(cors({ origin: '*', exposedHeaders: ['Authorization'] }));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// --- Config moteur de template ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-
-// --- Dossier public pour CSS / JS / images ---
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Import des routes API ---
-const indexRouter = require('./routes/index');      // Accueil API
-const userRouter = require('./routes/users');       // Routes Users + login/logout
-const catwayRouter = require('./routes/catway');   // Routes Catways + Reservations
+// --- Routes API ---
+const usersRouter = require('./routes/users');
+const catwayRouter = require('./routes/catway');
+app.use('/api/users', usersRouter);
+app.use('/api/catways', catwayRouter);
 
-// --- Import des routes pages front ---
-const pageRouter = require('./routes/pages');       // Pages CRUD + dashboard
+// --- Pages frontend ---
+const pageRouter = require('./routes/pages');
+app.use('/', pageRouter);
 
-// --- Déclaration des routes API ---
-app.use('/api', indexRouter);       // Toutes les routes d'API accessibles sous /api
-app.use('/api/users', userRouter);  // API Users
-app.use('/api/catways', catwayRouter); // API Catways + Reservations
+// Secret JWT fallback
+const SECRET = process.env.SECRET_KEY || 'superSecretKey';
 
-// --- Déclaration des routes front-end ---
-app.use('/', pageRouter);           // Pages front (login, dashboard, CRUD)
+// --- Route de connexion vers dashboard (formulaire POST depuis /) ---
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  console.log('Tentative de connexion pour :', email);
 
-// --- Gestion des routes inexistantes ---
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.render('index', { error: 'Utilisateur non trouvé' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.render('index', { error: 'Mot de passe incorrect' });
+
+    // Crée un token JWT valide 24h avec payload utilisateur
+    const payloadUser = { _id: user._id, username: user.username || user.name, email: user.email };
+    const token = jwt.sign({ user: payloadUser }, SECRET, { expiresIn: 24 * 60 * 60 });
+
+    // Met le token dans un cookie HTTP Only nommé 'token'
+    res.cookie('token', token, {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24h en ms
+      sameSite: 'lax'
+    });
+
+    // Redirige vers le tableau de bord
+    res.redirect('/dashboard');
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).render('index', { error: 'Erreur serveur.' });
+  }
+});
+
+// --- Gestion 404 ---
 app.use((req, res) => {
   res.status(404).json({
     name: 'API Capitainerie',

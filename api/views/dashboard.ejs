@@ -5,28 +5,42 @@
   <title>Tableau de bord</title>
 </head>
 <body>
-  <% include partials/header.ejs %>
+ <%- include('partials/header') %>
+
 
   <h1>Tableau de bord</h1>
-  <p>Connecté en tant que : <%= user.username %> (<%= user.email %>)</p>
-  <p>Date du jour : <%= date %></p>
 
-  <h2>Réservations en cours</h2>
-  <table border="1">
-    <thead>
-      <tr>
-        <th>Catway</th>
-        <th>Client</th>
-        <th>Bateau</th>
-        <th>Début</th>
-        <th>Fin</th>
-      </tr>
-    </thead>
-    <tbody id="reservations-table">
-      <!-- À remplir via JS / backend -->
-    </tbody>
-  </table>
+<nav>
+  <a href="/catways">Catways</a> |
+  <a href="/reservations">Réservations</a> |
+  <a href="/users">Utilisateurs</a> |
+  <a href="/api-docs">Documentation API</a> |
+  <a href="/logout">Déconnexion</a>
+</nav>
 
-  <% include partials/footer.ejs %>
+<h2>Bienvenue <%= user.name %> (<%= user.email %>)</h2>
+<p>Date : <%= date %></p>
+
+<h3>Réservations en cours</h3>
+<table border="1">
+  <tr>
+    <th>Catway</th>
+    <th>Début</th>
+    <th>Fin</th>
+    <th>Client</th>
+  </tr>
+  <% reservations.forEach(r => { %>
+    <tr>
+      <td><%= r.catway %></td>
+      <td><%= r.startDate %></td>
+      <td><%= r.endDate %></td>
+      <td><%= r.clientName %></td>
+    </tr>
+  <% }) %>
+</table>
+
+
+  <%- include('partials/footer') %>
+
 </body>
 </html>

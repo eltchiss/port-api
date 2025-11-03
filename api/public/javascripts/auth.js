@@ -1,92 +1,67 @@
-// auth.js - Gestion de la connexion et de la déconnexion (Frontend)
-
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Éléments du formulaire de connexion
-    const loginForm = document.getElementById('loginForm');
-    const messageContainer = document.getElementById('authMessage'); 
+    
+    // --- Utilitaire pour afficher les messages dans la zone dédiée ---
+    const authMessage = document.getElementById('authMessage');
+    const displayMessage = (message, isError = true) => {
+        if (!authMessage) return;
+        authMessage.textContent = message;
+        authMessage.className = `text-sm font-medium mb-4 p-2 rounded-md transition-all duration-300 ${
+            isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+        }`;
+    };
 
-    // 2. Logique de Connexion
+    // --- 1. Gestion de la Connexion ---
+    const loginForm = document.getElementById('loginForm');
     if (loginForm) {
+        // console.log('Login form found, attaching event listener.'); // Vous pouvez ajouter cette ligne pour confirmer
         loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); 
-            
-            if (messageContainer) messageContainer.textContent = ''; // Effacer les messages précédents
-            
-            // Récupère les valeurs des champs (doivent avoir les IDs 'email' et 'password')
-            const email = document.getElementById('email')?.value;
-            const password = document.getElementById('password')?.value;
-            
-            if (!email || !password) {
-                if (messageContainer) messageContainer.textContent = 'Veuillez remplir tous les champs.';
-                return;
-            }
+            e.preventDefault(); // <-- CECI DOIT ÊTRE EXÉCUTÉ !
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            displayMessage('', false); // Masquer les messages précédents
 
             try {
-                // Appel à l'API d'authentification (doit être POST /api/users/authenticate)
-                const response = await fetch('/api/users/authenticate', { 
+                // L'URL de l'API corrigée
+                const res = await fetch('/api/users/authenticate', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email, password }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
                 });
+
+                // Tenter de lire le JSON. Si le serveur renvoie du HTML (comme vous l'avez vu), 
+                // data.json() va échouer, d'où l'erreur. On le gère avec res.ok.
                 
-                if (response.ok) {
-                    const authHeader = response.headers.get('Authorization');
-                    
-                    if (authHeader && authHeader.startsWith('Bearer ')) {
-                        const token = authHeader.replace('Bearer ', '');
-                        
-                        // Stockage du Token JWT dans le localStorage
-                        localStorage.setItem('jwtToken', token);
-                        
-                        if (messageContainer) {
-                            messageContainer.textContent = 'Connexion réussie. Redirection...';
-                            messageContainer.style.color = 'green';
-                        }
-                        
-                        // Redirection vers le tableau de bord
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        displayMessage('Connexion réussie. Redirection...', false);
                         window.location.href = '/dashboard';
                     } else {
-                        if (messageContainer) {
-                             messageContainer.textContent = 'Erreur critique: Token non reçu de l\'API.';
-                             messageContainer.style.color = 'red';
-                        }
+                        // Cas rare où res.ok est vrai mais il n'y a pas de token (mauvais format de réponse)
+                        displayMessage('Réponse du serveur inattendue.');
                     }
                 } else {
-                    // Gestion des erreurs de l'API (403, 404, etc.)
-                    const errorResponse = await response.json().catch(() => ({}));
-                    let errorMessage = 'Erreur lors de la connexion. Veuillez vérifier l\'email et le mot de passe.';
-                    
-                    if (errorResponse === 'wrong_credentials') {
-                         errorMessage = 'Identifiants incorrects.';
-                    } else if (errorResponse === 'user_not_found') {
-                         errorMessage = 'Utilisateur non trouvé.';
-                    }
-                        
-                    if (messageContainer) {
-                         messageContainer.textContent = errorMessage;
-                         messageContainer.style.color = 'red';
-                    }
+                    // Ici, res.ok est faux (statut 401, 404, etc.)
+                    const errorData = await res.json().catch(() => ({ message: 'Erreur de connexion' }));
+                    const errorMessage = errorData.message || 'Identifiants incorrects ou utilisateur non trouvé.';
+                    displayMessage(`Échec : ${errorMessage}`);
                 }
-
-            } catch (error) {
-                console.error('Erreur réseau ou application :', error);
-                if (messageContainer) {
-                    messageContainer.textContent = 'Erreur serveur. Impossible de se connecter.';
-                    messageContainer.style.color = 'red';
-                }
+            } catch (err) {
+                console.error('Erreur réseau ou du serveur:', err);
+                displayMessage('Erreur de connexion. Veuillez réessayer (vérifiez la console).');
             }
         });
     }
 
-    // 3. Logique de Déconnexion
+    // --- 2. Gestion de la Déconnexion ---
     const logoutButton = document.getElementById('logoutButton');
     if (logoutButton) {
-        logoutButton.addEventListener('click', () => {
-            // Supprime le token stocké
-            localStorage.removeItem('jwtToken');
-            // Redirige vers la page d'accueil
+        logoutButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
             window.location.href = '/'; 
         });
     }
