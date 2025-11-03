@@ -10,19 +10,25 @@ On pourra se resservir de ces mêmes services pour d'autres entités que users
 */
 const express = require('express');
 const router = express.Router();
-
 const private = require('../middlewares/private');
-
 const service = require('../services/users');
-// La route pour lire les infos d'un utilisateur
-router.get('/:id', private.checkJWT, service.getById);
-// La route pour ajouter un utilisateur
-router.put('/add', service.add);
-// La route pour modifier un utilisateur
-router.patch('/:update',private.checkJWT, service.update);
-// La route pour supprimer un utilisateur
-router.delete('/:id', private.checkJWT, service.delete);
-// La route /authentification
+
+// Lister tous les utilisateurs
+router.get('/', private.checkJWT, service.getAll);
+
+// Récupérer un utilisateur par email
+router.get('/:email', private.checkJWT, service.getByEmail);
+
+// Créer un utilisateur
+router.post('/', service.add);
+
+// Modifier un utilisateur par email
+router.put('/:email', private.checkJWT, service.update);
+
+// Supprimer un utilisateur par email
+router.delete('/:email', private.checkJWT, service.delete);
+
+// Authentification
 router.post('/authenticate', service.authenticate);
 
 module.exports = router;

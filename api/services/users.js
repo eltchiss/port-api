@@ -1,124 +1,96 @@
-// On importe le modèle de données
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-//On exporte le callback afin d'y accéder dans notre gestionnaire de routes
-//Ici c'est le callback qui servira à ajouter un user avec son id
-exports.getById = async (req, res, next) => {
-    const id = req.params.id
-
-    try {
-        let user = await User.findById(id);
-
-        if (user) {
-            return res.status(200).json(user);
-        }
-
-        return res.status(404).json('user_not_found');
-    } catch (error) {
-        return res.status(501).json(error);
-    }
+// Lister tous les utilisateurs
+exports.getAll = async (req, res) => {
+  try {
+    const users = await User.find({}, '-password');
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
-//Ici c'est le callback qui servira à ajouter un user
-exports.add = async (req, res, next) => {
-
-    const temp = ({
-        username       : req.body.username,
-        email      : req.body.email,
-        password   : req.body.password
-    });
-
-    try {
-        let user = await User.create(temp);
-
-        return res.status(201).json(user);
-    } catch (error) {
-        return res.status(501).json(error);
-    }
+// Récupérer un utilisateur par email
+exports.getByEmail = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.params.email }, '-password');
+    if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
-//Ici c'est le callback qui servira à modifier un user
-exports.update = async (req, res, next) => {
-    const id = req.params.id
-    const temp = ({
-        username       : req.body.username,
-        email      : req.body.email,
-        password   : req.body.password
-    });
+// Créer un utilisateur
+exports.add = async (req, res) => {
+  const { username, email, password } = req.body;
+  try {
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: 'Cet email est déjà utilisé.' });
 
-    try {
-        let user = await User.findOne({_id : id});
-
-        if (user) {
-            Object.keys(temp).forEach((key) => {
-                if (!!temp[key]) {
-                    user[key] = temp[key];
-                }
-            });
-
-            await user.save();
-            return res.status(201).json(user);
-        }
-
-        return res.status(404).json('user_not_found');
-    } catch (error) {
-        return res.status(501).json(error);
-    }
+    const newUser = await User.create({ username, email, password });
+    res.status(201).json({ message: 'Utilisateur créé avec succès', user: newUser });
+  } catch (error) {
+    res.status(400).json(error);
+  }
 };
 
-//Ici c'est le callback qui servira à supprimer un user
-exports.delete = async (req, res, next) => {
-    const id = req.params.id
+// Modifier un utilisateur
+exports.update = async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ email: req.params.email });
+    if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
 
-    try {
-        await User.deleteOne({_id : id});
-        return res.status(204).json('delete_ok');
-    } catch (error) {
-        return res.status(501).json(error);
-    }
+    if (username) user.username = username;
+    if (password) user.password = bcrypt.hashSync(password, 10);
+
+    await user.save();
+    res.status(200).json({ message: 'Utilisateur mis à jour', user });
+  } catch (error) {
+    res.status(500).json(error);
+  }
 };
 
-//call back authentification
+// Supprimer un utilisateur
+exports.delete = async (req, res) => {
+  try {
+    const result = await User.findOneAndDelete({ email: req.params.email });
+    if (!result) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    res.status(204).json({ message: 'Utilisateur supprimé' });
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
 
+// Authentification
 exports.authenticate = async (req, res, next) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    try {
-        let user = await User.findOne({ email: email }, '-__v -createdAt -updatedAt');
+  try {
+    const user = await User.findOne({ email: email });
+    if (!user) return res.status(404).json({ message: 'user_not_found' });
 
-        if (user) {
-            bcrypt.compare(password, user.password, function(err, response) {
-                if (err) {
-                    throw new Error(err);
-                }
-                
-                if (response) {
-                    delete user._doc.password;
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(403).json({ message: 'wrong_credentials' });
 
-                    const expireIn = 24 * 60 * 60;
-                    const token = jwt.sign(
-                        {
-                            user: user
-                        },
-                        process.env.SECRET_KEY,
-                        {
-                            expiresIn: expireIn
-                        }
-                    );
+    // retire le mot de passe avant de renvoyer l'objet user
+    const userPayload = {
+      _id: user._id,
+      username: user.username,
+      email: user.email
+    };
 
-                    res.header('Authorization', 'Bearer ' + token);
+    const expiresIn = 24 * 60 * 60; // 24h en secondes
+    const token = jwt.sign({ user: userPayload }, process.env.SECRET_KEY, { expiresIn });
 
-                    return res.status(200).json('authenticate_succeed');
-                }
-
-                return res.status(403).json('wrong_credentials');
-            });
-        } else {
-            return res.status(404).json('user_not_found');
-        }
-    } catch (error) {
-        return res.status(501).json(error);
-    }
+    // renvoyer le token dans le body (et optionnellement l'entête)
+    res.header('Authorization', 'Bearer ' + token);
+    return res.status(200).json({ message: 'authenticate_succeed', token, user: userPayload });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 };
+

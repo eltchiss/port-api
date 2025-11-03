@@ -21,7 +21,8 @@ const User = new Schema({
     password: {
         type: String,
         trim: true,
-        required: [true, 'Le mot de passe est requis']
+        required: [true, 'Le mot de passe est requis'],
+        minlength: [8]
     },
 }, { // ajoute 2 champs au document createdAt et updatedAt
     timestamps: true
