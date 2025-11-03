@@ -1,11 +1,24 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title><%= title %></title>
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-  </head>
-  <body>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
-  </body>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Accueil - Port API</title>
+</head>
+<body>
+  <h1>Bienvenue sur Port API</h1>
+  <p>Gérez vos catways, réservations et utilisateurs depuis un tableau de bord simple.</p>
+
+  <% if (!user) { %>
+    <h2>Connexion</h2>
+    <form action="/login" method="POST">
+      <input type="email" name="email" placeholder="Email" required><br>
+      <input type="password" name="password" placeholder="Mot de passe" required><br>
+      <button type="submit">Se connecter</button>
+    </form>
+  <% } else { %>
+    <p>Bonjour <%= user.username %> ! <a href="/dashboard">Aller au tableau de bord</a></p>
+  <% } %>
+
+  <p><a href="/docs">Documentation de l'API</a></p>
+</body>
 </html>

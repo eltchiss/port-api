@@ -3,7 +3,7 @@ App.js : point d’entrée de l’application Express.
 - Initialise la connexion MongoDB
 - Active CORS et les middlewares essentiels
 - Monte les routes de l’API (users, catways)
-- Fournit une route d’accueil "/" simple (message JSON temporaire)
+- Fournit les pages front-end via EJS
 - Gère les erreurs 404
 */
 
@@ -11,6 +11,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const cors = require('cors');
+const path = require('path');
 
 const mongodb = require('./db/mongo');
 
@@ -19,7 +20,7 @@ mongodb.initClientDbConnection();
 
 const app = express();
 
-// Middlewares globaux
+// --- Middlewares globaux ---
 app.use(cors({
   exposedHeaders: ['Authorization'],
   origin: '*',
@@ -29,15 +30,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// --- Import des routes ---
-const indexRouter = require('./routes/index');    // Page d’accueil ou info API
-const userRouter = require('./routes/users');     // Routes Users
-const catwayRouter = require('./routes/catway'); // Routes Catways
+// --- Config moteur de template ---
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-// --- Déclaration des routes ---
-app.use('/', indexRouter);
-app.use('/users', userRouter);
-app.use('/catways', catwayRouter);
+// --- Dossier public pour CSS / JS / images ---
+app.use(express.static(path.join(__dirname, 'public')));
+
+// --- Import des routes API ---
+const indexRouter = require('./routes/index');      // Accueil API
+const userRouter = require('./routes/users');       // Routes Users + login/logout
+const catwayRouter = require('./routes/catway');   // Routes Catways + Reservations
+
+// --- Import des routes pages front ---
+const pageRouter = require('./routes/pages');       // Pages CRUD + dashboard
+
+// --- Déclaration des routes API ---
+app.use('/api', indexRouter);       // Toutes les routes d'API accessibles sous /api
+app.use('/api/users', userRouter);  // API Users
+app.use('/api/catways', catwayRouter); // API Catways + Reservations
+
+// --- Déclaration des routes front-end ---
+app.use('/', pageRouter);           // Pages front (login, dashboard, CRUD)
 
 // --- Gestion des routes inexistantes ---
 app.use((req, res) => {
