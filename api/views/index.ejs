@@ -1,51 +1,14 @@
-<%- include('header', { title: 'Port API - Connexion', user: null }) %>
+<h1>Bienvenue sur Port Manager</h1>
+<p>Connectez-vous pour accéder à votre tableau de bord.</p>
 
-<main class="container mx-auto p-4 flex-grow">
-    <h1 class="text-4xl font-extrabold mb-6 text-indigo-800">Bienvenue sur Port Capitainerie API</h1>
-    <p class="mb-10 text-gray-600 max-w-xl">
-        Gérez vos catways, réservations et utilisateurs de manière centralisée grâce à notre tableau de bord simple et sécurisé.
-    </p>
+<form action="/login" method="POST">
+  <input type="email" name="email" placeholder="Adresse e-mail" required>
+  <input type="password" name="password" placeholder="Mot de passe" required>
+  <button type="submit">Se connecter</button>
+</form>
 
-    <!-- Section de Connexion (Formulaire géré par JavaScript) -->
-    <section class="max-w-md bg-white p-8 rounded-xl shadow-xl border border-gray-200">
-        <h2 class="text-2xl font-bold mb-5 text-gray-800">Se connecter</h2>
-        
-        <!-- Conteneur essentiel pour afficher les messages d'erreur ou de succès -->
-        <div id="authMessage" class="text-sm font-medium mb-4 p-2 rounded-md transition-all duration-300"></div>
+<% if (error) { %>
+  <p style="color: red;"><%= error %></p>
+<% } %>
 
-        <!-- IMPORTANT : Le formulaire doit avoir l'ID 'loginForm' et les champs 'email'/'password' pour que auth.js fonctionne -->
-        <form id="loginForm" class="space-y-5">
-            <div>
-                <label for="email" class="block text-sm font-semibold text-gray-700 mb-1">Adresse Email</label>
-                <input type="email" id="email" name="email" required 
-                       class="w-full border border-gray-300 rounded-lg shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                       placeholder="votre.email@port.com">
-            </div>
-            
-            <div>
-                <label for="password" class="block text-sm font-semibold text-gray-700 mb-1">Mot de passe</label>
-                <input type="password" id="password" name="password" required 
-                       class="w-full border border-gray-300 rounded-lg shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
-                       placeholder="••••••••">
-            </div>
-
-            <button type="submit" 
-                    class="w-full py-3 px-4 rounded-lg shadow-md text-base font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition duration-200 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
-                Se connecter
-            </button>
-        </form>
-    </section>
-
-    <div class="mt-8">
-        <p class="text-gray-500">
-            Nouveau sur l'API ? Consultez la 
-            <a href="/api-docs" class="text-indigo-600 hover:text-indigo-800 font-medium underline">Documentation de l'API</a>.
-        </p>
-    </div>
-
-</main>
-
-<!-- IMPORTANT : Inclusion du script client avec le chemin corrigé (/javascripts/auth.js) -->
-<script src="/javascripts/auth.js"></script>
-
-<%- include('footer') %>
+<p><a href="/api-docs">Voir la documentation de l’API</a></p>
