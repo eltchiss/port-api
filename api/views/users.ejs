@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestion Utilisateurs</title>
+</head>
+<body>
+  <% include partials/header.ejs %>
+
+  <h1>Utilisateurs</h1>
+  <button onclick="window.location.href='/users/add'">Ajouter un utilisateur</button>
+
+  <table border="1">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Email</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="users-table">
+      <!-- Liste à remplir via fetch/AJAX -->
+    </tbody>
+  </table>
+
+  <% include partials/footer.ejs %>
+</body>
+</html>
