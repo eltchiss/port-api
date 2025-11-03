@@ -2,24 +2,30 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
+
 const SECRET = process.env.SECRET_KEY || 'superSecretKey';
 
-// page d'accueil
+/* -----------------------------
+   🏠 Page d'accueil
+----------------------------- */
 router.get('/', (req, res) => {
   res.render('index', { error: null });
 });
 
-// Middleware local pour vérifier token cookie et injecter req.user
+/* -----------------------------
+   🔐 Middleware de vérification du JWT dans le cookie
+----------------------------- */
 function checkTokenCookie(req, res, next) {
-  const token = req.cookies && req.cookies.token;
-  if (!token) {
-    return res.redirect('/');
-  }
+  const authCookie = req.cookies && (req.cookies.Authorization || req.cookies.token);
+  if (!authCookie) return res.redirect('/');
+
+  // Le cookie contient "Bearer xxx", on enlève le préfixe
+  const token = authCookie.replace('Bearer ', '');
 
   try {
     const decoded = jwt.verify(token, SECRET);
-    // token structure : { user: { ... }, iat, exp }
     req.user = decoded.user || decoded;
+    req.token = token;
     next();
   } catch (err) {
     console.error('JWT invalide :', err.message);
@@ -27,21 +33,49 @@ function checkTokenCookie(req, res, next) {
   }
 }
 
-// dashboard protégé
+/* -----------------------------
+   📊 Dashboard
+----------------------------- */
 router.get('/dashboard', checkTokenCookie, async (req, res) => {
-  // Si tu veux récupérer des réservations, fais-le ici via un service
   const today = new Date().toLocaleDateString('fr-FR');
 
-  // req.user contient { _id, username, email } si tu as respecté le payload
   res.render('dashboard', {
     user: req.user,
     date: today,
-    reservations: [] // remplacer par les réservations réelles via service
+    reservations: [] // tu pourras les charger plus tard via un service
   });
 });
 
-// déconnexion : supprime le cookie 'token'
+/* -----------------------------
+   ⚓ Page Catways (affiche la liste depuis l’API)
+----------------------------- */
+router.get('/catways', checkTokenCookie, async (req, res) => {
+  try {
+    // Appel interne à ton API protégée
+    const response = await axios.get('http://localhost:3003/api/catways', {
+      headers: { Authorization: `Bearer ${req.token}` }
+    });
+
+    res.render('catways', {
+      user: req.user,
+      catways: response.data,
+      error: null
+    });
+  } catch (err) {
+    console.error('Erreur de récupération des catways :', err.message);
+    res.render('catways', {
+      user: req.user,
+      catways: [],
+      error: 'Impossible de charger les catways.'
+    });
+  }
+});
+
+/* -----------------------------
+   🚪 Déconnexion
+----------------------------- */
 router.get('/logout', (req, res) => {
+  res.clearCookie('Authorization');
   res.clearCookie('token');
   res.redirect('/');
 });

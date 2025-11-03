@@ -2,15 +2,30 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Gestion Catways</title>
+  <title>Catways</title>
 </head>
 <body>
- <%- include('partials/header') %>
+  <h1>Gestion des Catways</h1>
+  <p>Connecté(e): <%= user.username %> - <%= user.email %></p>
+  <a href="/dashboard">Retour au tableau de bord</a> | 
+  <a href="/logout">Déconnexion</a>
 
-  <h1>Catways</h1>
-  <button onclick="window.location.href='/catways/add'">Ajouter un catway</button>
+  <h2>Créer un nouveau catway</h2>
+  <form action="/api/catways" method="POST">
+    <label>Numéro:</label>
+    <input type="number" name="catwayNumber" required />
+    <label>Type:</label>
+    <select name="catwayType" required>
+      <option value="long">Long</option>
+      <option value="short">Court</option>
+    </select>
+    <label>État:</label>
+    <input type="text" name="catwayState" required />
+    <button type="submit">Créer</button>
+  </form>
 
-  <table border="1">
+  <h2>Liste des catways</h2>
+  <table border="1" cellpadding="6">
     <thead>
       <tr>
         <th>Numéro</th>
@@ -19,11 +34,29 @@
         <th>Actions</th>
       </tr>
     </thead>
-    <tbody id="catways-table">
-      <!-- Liste à remplir via fetch/AJAX -->
+    <tbody>
+      <% catways.forEach(cat => { %>
+        <tr>
+          <td><%= cat.catwayNumber %></td>
+          <td><%= cat.catwayType %></td>
+          <td><%= cat.catwayState %></td>
+          <td>
+            <form action="/api/catways/<%= cat.catwayNumber %>?_method=PUT" method="POST" style="display:inline;">
+              <input type="text" name="catwayState" placeholder="Nouvel état" required>
+              <button type="submit">Modifier</button>
+            </form>
+            <form action="/api/catways/<%= cat.catwayNumber %>?_method=DELETE" method="POST" style="display:inline;">
+              <button type="submit" onclick="return confirm('Supprimer ce catway ?')">Supprimer</button>
+            </form>
+            <a href="/catways/<%= cat.catwayNumber %>">Détails</a>
+          </td>
+        </tr>
+      <% }) %>
     </tbody>
   </table>
 
-  <%- include('partials/footer') %>
+  <% if (error) { %>
+    <p style="color:red;"><%= error %></p>
+  <% } %>
 </body>
 </html>
