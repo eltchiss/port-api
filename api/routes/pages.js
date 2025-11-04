@@ -128,6 +128,98 @@ router.post('/catways/:id/delete', checkTokenCookie, async (req, res) => {
   }
 });
 
+/* === GESTION DES UTILISATEURS === */
+
+/* Lister tous les utilisateurs */
+router.get('/users', checkTokenCookie, async (req, res) => {
+  try {
+    const response = await axios.get('http://localhost:3003/api/users', {
+      headers: { Authorization: `Bearer ${req.token}` }
+    });
+
+    res.render('users', {
+      user: req.user,
+      users: response.data,
+      error: null
+    });
+  } catch (err) {
+    console.error('Erreur de récupération des utilisateurs :', err.message);
+    res.render('users', {
+      user: req.user,
+      users: [],
+      error: 'Impossible de charger les utilisateurs.'
+    });
+  }
+});
+
+/* Créer un utilisateur */
+router.post('/users', checkTokenCookie, async (req, res) => {
+  const { username, email, password } = req.body;
+
+  try {
+    await axios.post(
+      'http://localhost:3003/api/users',
+      { username, email, password },
+      { headers: { Authorization: `Bearer ${req.token}` } }
+    );
+    res.redirect('/users');
+  } catch (err) {
+    console.error('Erreur lors de la création de l’utilisateur :', err.message);
+    res.render('users', {
+      user: req.user,
+      users: [],
+      error: 'Erreur lors de la création de l’utilisateur.'
+    });
+  }
+});
+
+/* Modifier un utilisateur */
+router.post('/users/:email/update', checkTokenCookie, async (req, res) => {
+  try {
+    await axios.put(
+      `http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`,
+      req.body,
+      { headers: { Authorization: `Bearer ${req.token}` } }
+    );
+    res.redirect('/users');
+  } catch (err) {
+    console.error('Erreur modification utilisateur :', err.message);
+    res.redirect('/users');
+  }
+});
+
+/* Voir le détail d’un utilisateur */
+router.get('/users/:email', checkTokenCookie, async (req, res) => {
+  try {
+    const response = await axios.get(`http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`, {
+      headers: { Authorization: `Bearer ${req.token}` }
+    });
+
+    res.render('userDetails', {
+      user: req.user,
+      userDetails: response.data,
+      error: null
+    });
+  } catch (err) {
+    console.error('Erreur détail utilisateur :', err.message);
+    res.redirect('/users');
+  }
+});
+
+/* Supprimer un utilisateur */
+router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
+  try {
+    await axios.delete(`http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`, {
+      headers: { Authorization: `Bearer ${req.token}` }
+    });
+    res.redirect('/users');
+  } catch (err) {
+    console.error('Erreur suppression utilisateur :', err.message);
+    res.redirect('/users');
+  }
+});
+
+
 /* Déconnexion */
 router.get('/logout', (req, res) => {
   res.clearCookie('Authorization');
