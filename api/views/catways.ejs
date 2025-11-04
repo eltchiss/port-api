@@ -2,30 +2,43 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Catways</title>
+  <title>Gestion des Catways</title>
+  <style>
+    body { margin: 2em; font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    form.inline { display: inline; }
+    button { cursor: pointer; }
+    .error { color: red; }
+  </style>
 </head>
 <body>
   <h1>Gestion des Catways</h1>
-  <p>Connecté(e): <%= user.username %> - <%= user.email %></p>
-  <a href="/dashboard">Retour au tableau de bord</a> | 
+  <p>Connecté(e) : <%= user.username %> - <%= user.email %></p>
+  <a href="/dashboard">Retour au tableau de bord</a> |
   <a href="/logout">Déconnexion</a>
 
+  <hr>
+
   <h2>Créer un nouveau catway</h2>
-  <form action="/api/catways" method="POST">
-    <label>Numéro:</label>
-    <input type="number" name="catwayNumber" required />
-    <label>Type:</label>
+  <form id="createCatwayForm">
+    <label>Numéro :</label>
+    <input type="number" name="catwayNumber" required>
+    <label>Type :</label>
     <select name="catwayType" required>
       <option value="long">Long</option>
       <option value="short">Court</option>
     </select>
-    <label>État:</label>
-    <input type="text" name="catwayState" required />
+    <label>État :</label>
+    <input type="text" name="catwayState" required>
     <button type="submit">Créer</button>
   </form>
 
+  <hr>
+
   <h2>Liste des catways</h2>
-  <table border="1" cellpadding="6">
+  <table>
     <thead>
       <tr>
         <th>Numéro</th>
@@ -35,28 +48,95 @@
       </tr>
     </thead>
     <tbody>
-      <% catways.forEach(cat => { %>
-        <tr>
-          <td><%= cat.catwayNumber %></td>
-          <td><%= cat.catwayType %></td>
-          <td><%= cat.catwayState %></td>
-          <td>
-            <form action="/api/catways/<%= cat.catwayNumber %>?_method=PUT" method="POST" style="display:inline;">
-              <input type="text" name="catwayState" placeholder="Nouvel état" required>
-              <button type="submit">Modifier</button>
-            </form>
-            <form action="/api/catways/<%= cat.catwayNumber %>?_method=DELETE" method="POST" style="display:inline;">
-              <button type="submit" onclick="return confirm('Supprimer ce catway ?')">Supprimer</button>
-            </form>
-            <a href="/catways/<%= cat.catwayNumber %>">Détails</a>
-          </td>
-        </tr>
-      <% }) %>
+      <% if (!catways || catways.length === 0) { %>
+        <tr><td colspan="4">Aucun catway enregistré.</td></tr>
+      <% } else { %>
+        <% catways.forEach(cat => { %>
+          <tr>
+            <td><%= cat.catwayNumber %></td>
+            <td><%= cat.catwayType %></td>
+            <td><%= cat.catwayState %></td>
+            <td>
+              <button class="update-btn" data-number="<%= cat.catwayNumber %>">Modifier</button>
+              <button class="delete-btn" data-number="<%= cat.catwayNumber %>">Supprimer</button>
+              <a href="/catways/<%= cat.catwayNumber %>">Détails</a>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
     </tbody>
   </table>
 
   <% if (error) { %>
-    <p style="color:red;"><%= error %></p>
+    <p class="error"><%= error %></p>
   <% } %>
+
+  <script>
+    // === CRÉATION ===
+    document.getElementById('createCatwayForm').addEventListener('submit', async (e) => {
+      e.preventDefault(); 
+      const form = e.target;
+      const data = {
+        catwayNumber: Number(form.catwayNumber.value),
+        catwayType: form.catwayType.value,
+        catwayState: form.catwayState.value
+      };
+
+      const res = await fetch('/api/catways', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).message || 'Erreur création';
+        alert(msg);
+      }
+      location.reload(); // recharge simplement la page
+    });
+
+    // === MODIFICATION & SUPPRESSION ===
+    document.addEventListener('click', async (ev) => { //Attache un seul écouteur au document pour tous les clics.
+      const number = ev.target.dataset.number;
+      if (!number) return;
+
+      // Modification
+      if (ev.target.classList.contains('update-btn')) {
+        const newState = prompt('Nouvel état pour le catway ' + number + ' ?');
+        if (!newState) return;
+
+        const res = await fetch('/api/catways/' + encodeURIComponent(number), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ catwayState: newState })
+        });
+
+        if (!res.ok) {
+          const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour';
+          alert(msg);
+        }
+        location.reload(); // rechargement simple
+        return;
+      }
+
+      // Suppression
+      if (ev.target.classList.contains('delete-btn')) {
+        if (!confirm('Supprimer le catway ' + number + ' ?')) return;
+
+        const res = await fetch('/api/catways/' + encodeURIComponent(number), {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression';
+          alert(msg);
+        }
+        location.reload(); // rechargement simple
+      }
+    });
+  </script>
 </body>
 </html>
