@@ -2,27 +2,153 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Gestion Utilisateurs</title>
+  <title>Gestion des Utilisateurs</title>
+  <style>
+    body { margin: 2em; font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #eee; }
+    button { cursor: pointer; }
+    .error { color: red; }
+  </style>
 </head>
 <body>
-  <% include partials/header.ejs %>
+  <h1>Gestion des Utilisateurs</h1>
+  <p>Connecté(e) : <%= user.username %> - <%= user.email %></p>
+  <a href="/dashboard">Retour au tableau de bord</a> |
+  <a href="/logout">Déconnexion</a>
 
-  <h1>Utilisateurs</h1>
-  <button onclick="window.location.href='/users/add'">Ajouter un utilisateur</button>
+  <hr>
 
-  <table border="1">
+  <!-- === FORMULAIRE DE CRÉATION === -->
+  <h2>Créer un nouvel utilisateur</h2>
+  <form id="createUserForm">
+    <label>Nom :</label>
+    <input type="text" name="username" required>
+
+    <label>Email :</label>
+    <input type="email" name="email" required>
+
+    <label>Mot de passe :</label>
+    <input type="password" name="password" required>
+
+    <button type="submit">Créer</button>
+  </form>
+
+  <hr>
+
+  <!-- === LISTE DES UTILISATEURS === -->
+  <h2>Liste des utilisateurs</h2>
+  <table>
     <thead>
       <tr>
         <th>Nom</th>
         <th>Email</th>
+        <th>Créé le</th>
         <th>Actions</th>
       </tr>
     </thead>
-    <tbody id="users-table">
-      <!-- Liste à remplir via fetch/AJAX -->
+    <tbody>
+      <% if (!users || users.length === 0) { %>
+        <tr><td colspan="4">Aucun utilisateur enregistré.</td></tr>
+      <% } else { %>
+        <% users.forEach(u => { %>
+          <tr>
+            <td><%= u.username %></td>
+            <td><%= u.email %></td>
+            <td><%= new Date(u.createdAt).toLocaleDateString('fr-FR') %></td>
+            <td>
+              <button class="update-btn" data-email="<%= u.email %>">Modifier</button>
+              <button class="delete-btn" data-email="<%= u.email %>">Supprimer</button>
+              <a href="/users/<%= u.email %>">Détails</a>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
     </tbody>
   </table>
 
-  <% include partials/footer.ejs %>
+  <% if (error) { %>
+    <p class="error"><%= error %></p>
+  <% } %>
+
+  <script>
+    // === CRÉATION ===
+    document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        username: form.username.value,
+        email: form.email.value,
+        password: form.password.value
+      };
+
+      const res = await fetch('/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).message || 'Erreur création utilisateur';
+        alert(msg);
+      } else {
+        alert('Utilisateur créé avec succès');
+      }
+      location.reload();
+    });
+
+    // === MISE À JOUR & SUPPRESSION ===
+    document.addEventListener('click', async (ev) => {
+      const email = ev.target.dataset.email;
+      if (!email) return;
+
+      // --- MODIFIER ---
+      if (ev.target.classList.contains('update-btn')) {
+        const newName = prompt(`Nouveau nom pour ${email} ?`);
+        const newPassword = prompt(`Nouveau mot de passe (laisser vide pour ne pas changer) :`);
+        if (!newName && !newPassword) return;
+
+        const body = {};
+        if (newName) body.username = newName;
+        if (newPassword) body.password = newPassword;
+
+        const res = await fetch('/users/' + encodeURIComponent(email), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour utilisateur';
+          alert(msg);
+        } else {
+          alert('Utilisateur mis à jour');
+        }
+        location.reload();
+        return;
+      }
+
+      // --- SUPPRIMER ---
+      if (ev.target.classList.contains('delete-btn')) {
+        if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+
+        const res = await fetch('/users/' + encodeURIComponent(email), {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression utilisateur';
+          alert(msg);
+        } else {
+          alert('Utilisateur supprimé');
+        }
+        location.reload();
+      }
+    });
+  </script>
 </body>
 </html>
