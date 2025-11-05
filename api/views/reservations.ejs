@@ -4,17 +4,23 @@
   <meta charset="UTF-8">
   <title>Gestion des Réservations</title>
   <style>
-    body { margin: 2em; font-family: Arial, sans-serif; }
+    body { margin: 2em; }
     table { border-collapse: collapse; width: 100%; margin-top: 1em; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background: #eee; }
     form.inline { display: inline; }
-    button { cursor: pointer; }
+    button { cursor: pointer; padding: 4px 8px; margin: 2px; border-radius: 4px; }
     .error { color: red; }
+    
+    /* Style pour indiquer les cellules éditables */
+    .editable[contenteditable="true"] {
+        background-color: #fffacd; /* Jaune clair pour signaler l'édition */
+        border: 1px dashed #ccc;
+    }
   </style>
 </head>
 <body>
-  <h1>Gestion des Réservations</h1>
+  <h1>Gestion des Réservations (Mode Édition Explicite)</h1>
   <p>Connecté(e) : <%= user.username %> - <%= user.email %></p>
   <a href="/dashboard">Retour au tableau de bord</a> |
   <a href="/logout">Déconnexion</a>
@@ -54,16 +60,44 @@
       <% if (!reservations || reservations.length === 0) { %>
         <tr><td colspan="6">Aucune réservation enregistrée.</td></tr>
       <% } else { %>
-        <% reservations.forEach(r => { %>
-          <tr>
+        <% reservations.forEach(r => { 
+            // Stocke la date brute pour comparaison lors de la modification
+            const rawStartDate = new Date(r.startDate).toISOString().split('T')[0];
+            const rawEndDate = new Date(r.endDate).toISOString().split('T')[0];
+        %>
+          <tr 
+            data-catway="<%= r.catwayNumber %>" 
+            data-id="<%= r._id %>"
+            data-boat-name-original="<%= r.boatName %>"
+            data-start-date-original="<%= rawStartDate %>"
+            data-end-date-original="<%= rawEndDate %>"
+          >
             <td><%= r.catwayNumber %></td>
             <td><%= r.clientName %></td>
-            <td><%= r.boatName %></td>
-            <td><%= new Date(r.startDate).toLocaleDateString() %></td>
-            <td><%= new Date(r.endDate).toLocaleDateString() %></td>
+            
+            <!-- Champs éditables - Par défaut non éditables -->
+            <td 
+                class="editable boatName" 
+                contenteditable="false" 
+                data-field="boatName"
+            ><%= r.boatName %></td>
+            <td 
+                class="editable startDate" 
+                contenteditable="false" 
+                data-field="startDate"
+            ><%= new Date(r.startDate).toLocaleDateString() %></td>
+            <td 
+                class="editable endDate" 
+                contenteditable="false" 
+                data-field="endDate"
+            ><%= new Date(r.endDate).toLocaleDateString() %></td>
+            
             <td>
-              <button class="update-btn" data-catway="<%= r.catwayNumber %>" data-id="<%= r._id %>">Modifier</button>
-              <button class="delete-btn" data-catway="<%= r.catwayNumber %>" data-id="<%= r._id %>">Supprimer</button>
+              <button class="toggle-edit-btn">Modifier</button>
+              <!-- Les boutons Enregistrer et Annuler sont cachés par défaut -->
+              <button class="save-btn hidden">Enregistrer</button>
+              <button class="cancel-btn hidden">Annuler</button>
+              <button class="delete-btn">Supprimer</button>
               <a href="/catways/<%= r.catwayNumber %>/reservations/<%= r._id %>">Détails</a>
             </td>
           </tr>
@@ -77,6 +111,48 @@
   <% } %>
 
   <script>
+    function showModal(message) {
+        // Utilisé pour l'affichage des messages d'erreur et de succès
+        alert(message);
+    }
+    
+    // Fonction utilitaire pour gérer les erreurs et afficher le code de statut
+    async function handleApiError(res, defaultMsg) {
+        const status = res.status;
+        try {
+            const body = await res.json();
+            const msg = body.message || defaultMsg;
+            showModal(`Erreur (${status}) : ${msg}`);
+        } catch (e) {
+            showModal(`Erreur critique : Statut HTTP ${status} (Réponse non-JSON)`);
+        }
+    }
+
+    // Fonction pour gérer le mode édition/visualisation
+    function setRowEditable(row, isEditable) {
+        const cells = row.querySelectorAll('.editable');
+        const toggleBtn = row.querySelector('.toggle-edit-btn');
+        const saveBtn = row.querySelector('.save-btn');
+        const cancelBtn = row.querySelector('.cancel-btn');
+
+        cells.forEach(cell => {
+            cell.contentEditable = isEditable ? "true" : "false";
+        });
+
+        if (isEditable) {
+            toggleBtn.classList.add('hidden');
+            saveBtn.classList.remove('hidden');
+            cancelBtn.classList.remove('hidden');
+            // Mettre le focus sur le premier champ éditable
+            row.querySelector('.boatName').focus();
+        } else {
+            toggleBtn.classList.remove('hidden');
+            saveBtn.classList.add('hidden');
+            cancelBtn.classList.add('hidden');
+        }
+    }
+
+
     // === CRÉATION ===
     document.getElementById('createReservationForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -97,52 +173,129 @@
       });
 
       if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).message || 'Erreur création';
-        alert(msg);
+        await handleApiError(res, 'Erreur lors de la création de la réservation');
+      } else {
+        showModal('Réservation créée avec succès');
       }
       location.reload();
     });
 
-    // === MODIFICATION & SUPPRESSION ===
+    // === GESTION DES CLICS SUR LES ACTIONS (Modifier/Enregistrer/Annuler/Supprimer) ===
     document.addEventListener('click', async (ev) => {
-      const catway = ev.target.dataset.catway;
-      const id = ev.target.dataset.id;
+      const target = ev.target;
+      const row = target.closest('tr');
+      if (!row) return;
+      
+      const catway = row.dataset.catway;
+      const id = row.dataset.id;
       if (!catway || !id) return;
-
-      // MODIFICATION
-if (ev.target.classList.contains('update-btn')) {
-  const newBoatName = prompt('Nouveau nom du bateau :');
-  if (!newBoatName) return;
-
-  const newStartDate = prompt('Nouvelle date de début (YYYY-MM-DD) :');
-  if (!newStartDate) return;
-
-  const newEndDate = prompt('Nouvelle date de fin (YYYY-MM-DD) :');
-  if (!newEndDate) return;
-
-  const res = await fetch(`/api/catways/${catway}/reservations/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      boatName: newBoatName,
-      startDate: newStartDate,
-      endDate: newEndDate
-    })
-  });
-
-  if (!res.ok) {
-    const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour';
-    alert(msg);
-  }
-  location.reload();
-  return;
-}
+      
+      const originalBoatName = row.dataset.boatNameOriginal;
+      const originalStartDate = row.dataset.startDateOriginal;
+      const originalEndDate = row.dataset.endDateOriginal;
 
 
-      // SUPPRESSION
-      if (ev.target.classList.contains('delete-btn')) {
-        if (!confirm('Supprimer cette réservation ?')) return;
+      // --- 1. BOUTON MODIFIER (Toggle d'édition) ---
+      if (target.classList.contains('toggle-edit-btn')) {
+        setRowEditable(row, true);
+        return;
+      }
+
+      // --- 2. BOUTON ANNULER ---
+      if (target.classList.contains('cancel-btn')) {
+        // Annuler les modifications en restaurant les valeurs originales
+        row.querySelector('.boatName').innerText = originalBoatName;
+        row.querySelector('.startDate').innerText = new Date(originalStartDate).toLocaleDateString();
+        row.querySelector('.endDate').innerText = new Date(originalEndDate).toLocaleDateString();
+        setRowEditable(row, false);
+        return;
+      }
+      
+      // --- 3. BOUTON ENREGISTRER (Mise à jour) ---
+      if (target.classList.contains('save-btn')) {
+        const boatNameCell = row.querySelector('.boatName');
+        const startDateCell = row.querySelector('.startDate');
+        const endDateCell = row.querySelector('.endDate');
+
+        const newBoatName = boatNameCell.innerText.trim();
+        const newStartDateDisplay = startDateCell.innerText.trim();
+        const newEndDateDisplay = endDateCell.innerText.trim();
+        
+        // Corps de la requête (ne contient que les champs modifiés)
+        const body = {};
+        let needsUpdate = false;
+
+        // Bateau
+        if (newBoatName !== originalBoatName) {
+            body.boatName = newBoatName;
+            needsUpdate = true;
+        }
+
+        // Date de Début - Utilisation d'un prompt pour garantir le format AAAA-MM-JJ
+        let newStartDateAPI = originalStartDate; // Par défaut
+        if (newStartDateDisplay !== new Date(originalStartDate).toLocaleDateString()) {
+            newStartDateAPI = prompt(`Nouvelle date de DÉBUT pour ${newBoatName} (format AAAA-MM-JJ) :`, originalStartDate);
+            if (newStartDateAPI) { // Si l'utilisateur n'annule pas
+                body.startDate = newStartDateAPI;
+                needsUpdate = true;
+                // Mettre à jour l'affichage avec le format local si l'API est correcte
+                startDateCell.innerText = new Date(newStartDateAPI).toLocaleDateString(); 
+            } else {
+                // Rétablir la valeur affichée si l'utilisateur annule le prompt
+                startDateCell.innerText = new Date(originalStartDate).toLocaleDateString();
+            }
+        }
+
+        // Date de Fin - Utilisation d'un prompt pour garantir le format AAAA-MM-JJ
+        let newEndDateAPI = originalEndDate; // Par défaut
+        if (newEndDateDisplay !== new Date(originalEndDate).toLocaleDateString()) {
+            newEndDateAPI = prompt(`Nouvelle date de FIN pour ${newBoatName} (format AAAA-MM-JJ) :`, originalEndDate);
+            if (newEndDateAPI) { // Si l'utilisateur n'annule pas
+                body.endDate = newEndDateAPI;
+                needsUpdate = true;
+                // Mettre à jour l'affichage avec le format local si l'API est correcte
+                endDateCell.innerText = new Date(newEndDateAPI).toLocaleDateString();
+            } else {
+                 // Rétablir la valeur affichée si l'utilisateur annule le prompt
+                endDateCell.innerText = new Date(originalEndDate).toLocaleDateString();
+            }
+        }
+        
+        if (!needsUpdate) {
+            showModal("Aucun changement détecté. Annulation de la mise à jour.");
+            setRowEditable(row, false);
+            return;
+        }
+
+        const res = await fetch(`/api/catways/${catway}/reservations/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            await handleApiError(res, 'Erreur lors de la mise à jour de la réservation');
+            // Recharger la page en cas d'erreur pour resynchroniser les données
+            location.reload(); 
+        } else {
+            showModal('Réservation mise à jour avec succès.');
+            
+            // Mise à jour des attributs 'original' pour les prochaines éditions
+            row.dataset.boatNameOriginal = newBoatName;
+            if (body.startDate) row.dataset.startDateOriginal = newStartDateAPI;
+            if (body.endDate) row.dataset.endDateOriginal = newEndDateAPI;
+
+            setRowEditable(row, false); // Quitter le mode édition
+        }
+        return;
+      }
+      
+      // --- 4. BOUTON SUPPRIMER ---
+      if (target.classList.contains('delete-btn')) {
+        // Utilisation de prompt pour remplacer confirm()
+        const confirmation = prompt(`Taper OUI pour supprimer la réservation ID ${id} :`);
+        if (confirmation !== 'OUI') return;
 
         const res = await fetch(`/api/catways/${catway}/reservations/${id}`, {
           method: 'DELETE',
@@ -150,8 +303,9 @@ if (ev.target.classList.contains('update-btn')) {
         });
 
         if (!res.ok) {
-          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression';
-          alert(msg);
+          await handleApiError(res, 'Erreur lors de la suppression de la réservation');
+        } else {
+          showModal('Réservation supprimée');
         }
         location.reload();
       }
