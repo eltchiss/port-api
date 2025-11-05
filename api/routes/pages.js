@@ -39,6 +39,8 @@ router.get('/dashboard', checkTokenCookie, async (req, res) => {
   });
 });
 
+/*GESTION DES CATWAYS */
+
 /* Lister tous les catways */
 router.get('/catways', checkTokenCookie, async (req, res) => {
   try {
@@ -128,7 +130,7 @@ router.post('/catways/:id/delete', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* === GESTION DES UTILISATEURS === */
+/*GESTION DES UTILISATEURS*/
 
 /* Lister tous les utilisateurs */
 router.get('/users', checkTokenCookie, async (req, res) => {
@@ -218,6 +220,62 @@ router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
     res.redirect('/users');
   }
 });
+
+/* GESTION DES RESERVATIONS */
+/* Lister les réservations */
+router.get('/reservations', checkTokenCookie, async (req, res) => {
+  try {
+    // une route "globale" /api/reservations 
+    try {
+      const respGlobal = await axios.get('http://localhost:3003/api/reservations', {
+        headers: { Authorization: `Bearer ${req.token}` }
+      });
+      return res.render('reservations', {
+        user: req.user,
+        reservations: respGlobal.data,
+        error: null
+      });
+    } catch (errGlobal) {
+      // si la route globale n'existe pas, on fera le fallback (poursuite)
+      // console.log('Pas de route globale /api/reservations, fallback -> aggreg catways');
+    }
+
+    // récupérer tous les catways puis leurs réservations (sous-resources)
+    const catwaysResp = await axios.get('http://localhost:3003/api/catways', {
+      headers: { Authorization: `Bearer ${req.token}` }
+    });
+    const catways = catwaysResp.data || [];
+
+    // Pour chaque catway on récupère ses réservations
+    const reservationsPromises = catways.map(c =>
+      axios.get(`http://localhost:3003/api/catways/${encodeURIComponent(c.catwayNumber || c._id)}/reservations`, {
+        headers: { Authorization: `Bearer ${req.token}` }
+      }).then(r => r.data).catch(e => {
+        // si une sous-route échoue on renvoie [] pour ce catway
+        console.error(`Erreur récupération réservations catway ${c.catwayNumber || c._id}:`, e.response ? e.response.data : e.message);
+        return [];
+      })
+    );
+
+    const nested = await Promise.all(reservationsPromises);
+    // aplatir et ajouter information du catway si tu veux
+    const reservations = nested.flat().map(r => ({ ...r }));
+
+    res.render('reservations', {
+      user: req.user,
+      reservations,
+      error: null
+    });
+  } catch (err) {
+    console.error('Erreur récupération globale des réservations :', err.response ? err.response.data : err.message);
+    res.render('reservations', {
+      user: req.user,
+      reservations: [],
+      error: 'Impossible de charger les réservations.'
+    });
+  }
+});
+
 
 
 /* Déconnexion */
