@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+const swaggerJSDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
 const clientOptions = {
     useNewUrlParser : true,
     dbName          : 'apinodé'
