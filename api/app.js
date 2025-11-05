@@ -6,7 +6,7 @@ const path = require('path');
 const mongodb = require('./db/mongo');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const User = require('./models/user'); // <-- ton modèle utilisateur
+const User = require('./models/user'); 
 
 mongodb.initClientDbConnection();
 
@@ -18,15 +18,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
+
+require('./swagger')(app);
 
 // --- Routes API ---
 const usersRouter = require('./routes/users');
 const catwayRouter = require('./routes/catway');
 app.use('/api/users', usersRouter);
 app.use('/api/catways', catwayRouter);
+
 
 // --- Pages frontend ---
 const pageRouter = require('./routes/pages');

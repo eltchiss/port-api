@@ -3,17 +3,21 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 
+
+// CONFIGURATION & MIDDLEWARES
+
+
+// Clé secrète utilisée pour vérifier la signature des jetons JWT.
+// Doit correspondre à la clé utilisée par le service d'authentification.
 const SECRET = process.env.SECRET_KEY || 'superSecretKey';
 
-/*Page d'accueil*/
-router.get('/', (req, res) => {
-  res.render('index', { error: null });
-});
-
-/*Middleware de vérification du JWT dans le cookie*/
+// Middleware : Vérifie la présence et la validité du token JWT dans les cookies
 function checkTokenCookie(req, res, next) {
   const authCookie = req.cookies && (req.cookies.Authorization || req.cookies.token);
-  if (!authCookie) return res.redirect('/');
+
+  if (!authCookie) {
+    return res.redirect('/');
+  }
 
   const token = authCookie.replace('Bearer ', '');
 
@@ -28,20 +32,47 @@ function checkTokenCookie(req, res, next) {
   }
 }
 
-/* Dashboard*/
+
+// PAGE D’ACCUEIL (LOGIN / REDIRECTION)
+
+
+router.get('/', (req, res) => {
+  const hasToken = req.cookies && (req.cookies.Authorization || req.cookies.token);
+
+  if (hasToken) {
+    return res.redirect('/dashboard');
+  }
+
+  res.render('index', { error: null });
+});
+
+
+// ROUTES PROTÉGÉES
+
+
+// GET /dashboard
 router.get('/dashboard', checkTokenCookie, async (req, res) => {
   const today = new Date().toLocaleDateString('fr-FR');
 
   res.render('dashboard', {
     user: req.user,
     date: today,
-    reservations: []
+    reservations: [] // à charger dynamiquement au besoin
   });
 });
 
-/*GESTION DES CATWAYS */
+// GET /logout
+router.get('/logout', (req, res) => {
+  res.clearCookie('Authorization');
+  res.clearCookie('token');
+  res.redirect('/');
+});
 
-/* Lister tous les catways */
+
+// GESTION DES CATWAYS
+
+
+// GET /catways
 router.get('/catways', checkTokenCookie, async (req, res) => {
   try {
     const response = await axios.get('http://localhost:3003/api/catways', {
@@ -63,7 +94,7 @@ router.get('/catways', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Créer un catway */
+// POST /catways
 router.post('/catways', checkTokenCookie, async (req, res) => {
   const { catwayNumber, catwayType, catwayState } = req.body;
 
@@ -84,7 +115,7 @@ router.post('/catways', checkTokenCookie, async (req, res) => {
   }
 });
 
-/*Modifier l’état d’un catway*/
+// POST /catways/:id/update
 router.post('/catways/:id/update', checkTokenCookie, async (req, res) => {
   try {
     await axios.put(
@@ -99,7 +130,7 @@ router.post('/catways/:id/update', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Voir le détail d’un catway*/
+// GET /catways/:id
 router.get('/catways/:id', checkTokenCookie, async (req, res) => {
   try {
     const response = await axios.get(`http://localhost:3003/api/catways/${req.params.id}`, {
@@ -117,7 +148,7 @@ router.get('/catways/:id', checkTokenCookie, async (req, res) => {
   }
 });
 
-/*Supprimer un catway*/
+// POST /catways/:id/delete
 router.post('/catways/:id/delete', checkTokenCookie, async (req, res) => {
   try {
     await axios.delete(`http://localhost:3003/api/catways/${req.params.id}`, {
@@ -130,9 +161,10 @@ router.post('/catways/:id/delete', checkTokenCookie, async (req, res) => {
   }
 });
 
-/*GESTION DES UTILISATEURS*/
 
-/* Lister tous les utilisateurs */
+// GESTION DES UTILISATEURS
+
+// GET /users
 router.get('/users', checkTokenCookie, async (req, res) => {
   try {
     const response = await axios.get('http://localhost:3003/api/users', {
@@ -154,7 +186,7 @@ router.get('/users', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Créer un utilisateur */
+// POST /users
 router.post('/users', checkTokenCookie, async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -175,7 +207,7 @@ router.post('/users', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Modifier un utilisateur */
+// POST /users/:email/update
 router.post('/users/:email/update', checkTokenCookie, async (req, res) => {
   try {
     await axios.put(
@@ -190,12 +222,13 @@ router.post('/users/:email/update', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Voir le détail d’un utilisateur */
+// GET /users/:email
 router.get('/users/:email', checkTokenCookie, async (req, res) => {
   try {
-    const response = await axios.get(`http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`, {
-      headers: { Authorization: `Bearer ${req.token}` }
-    });
+    const response = await axios.get(
+      `http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`,
+      { headers: { Authorization: `Bearer ${req.token}` } }
+    );
 
     res.render('userDetails', {
       user: req.user,
@@ -208,12 +241,13 @@ router.get('/users/:email', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* Supprimer un utilisateur */
+// POST /users/:email/delete
 router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
   try {
-    await axios.delete(`http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`, {
-      headers: { Authorization: `Bearer ${req.token}` }
-    });
+    await axios.delete(
+      `http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`,
+      { headers: { Authorization: `Bearer ${req.token}` } }
+    );
     res.redirect('/users');
   } catch (err) {
     console.error('Erreur suppression utilisateur :', err.message);
@@ -221,44 +255,50 @@ router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
   }
 });
 
-/* GESTION DES RESERVATIONS */
-/* Lister les réservations */
+
+// GESTION DES RÉSERVATIONS
+
+
 router.get('/reservations', checkTokenCookie, async (req, res) => {
   try {
-    // une route "globale" /api/reservations 
+    // 1️⃣ Tentative : route API globale
     try {
       const respGlobal = await axios.get('http://localhost:3003/api/reservations', {
         headers: { Authorization: `Bearer ${req.token}` }
       });
+
       return res.render('reservations', {
         user: req.user,
         reservations: respGlobal.data,
         error: null
       });
-    } catch (errGlobal) {
-      // si la route globale n'existe pas, on fera le fallback (poursuite)
-      // console.log('Pas de route globale /api/reservations, fallback -> aggreg catways');
+    } catch {
+      // Fallback vers agrégation
     }
 
-    // récupérer tous les catways puis leurs réservations (sous-resources)
+    // 2️⃣ Agrégation manuelle
     const catwaysResp = await axios.get('http://localhost:3003/api/catways', {
       headers: { Authorization: `Bearer ${req.token}` }
     });
+
     const catways = catwaysResp.data || [];
 
-    // Pour chaque catway on récupère ses réservations
     const reservationsPromises = catways.map(c =>
-      axios.get(`http://localhost:3003/api/catways/${encodeURIComponent(c.catwayNumber || c._id)}/reservations`, {
-        headers: { Authorization: `Bearer ${req.token}` }
-      }).then(r => r.data).catch(e => {
-        // si une sous-route échoue on renvoie [] pour ce catway
-        console.error(`Erreur récupération réservations catway ${c.catwayNumber || c._id}:`, e.response ? e.response.data : e.message);
-        return [];
-      })
+      axios
+        .get(`http://localhost:3003/api/catways/${encodeURIComponent(c.catwayNumber || c._id)}/reservations`, {
+          headers: { Authorization: `Bearer ${req.token}` }
+        })
+        .then(r => r.data)
+        .catch(e => {
+          console.error(
+            `Erreur récupération réservations catway ${c.catwayNumber || c._id}:`,
+            e.response ? e.response.data : e.message
+          );
+          return [];
+        })
     );
 
     const nested = await Promise.all(reservationsPromises);
-    // aplatir et ajouter information du catway si tu veux
     const reservations = nested.flat().map(r => ({ ...r }));
 
     res.render('reservations', {
@@ -267,22 +307,17 @@ router.get('/reservations', checkTokenCookie, async (req, res) => {
       error: null
     });
   } catch (err) {
-    console.error('Erreur récupération globale des réservations :', err.response ? err.response.data : err.message);
+    console.error(
+      'Erreur récupération globale des réservations :',
+      err.response ? err.response.data : err.message
+    );
+
     res.render('reservations', {
       user: req.user,
       reservations: [],
       error: 'Impossible de charger les réservations.'
     });
   }
-});
-
-
-
-/* Déconnexion */
-router.get('/logout', (req, res) => {
-  res.clearCookie('Authorization');
-  res.clearCookie('token');
-  res.redirect('/');
 });
 
 module.exports = router;
