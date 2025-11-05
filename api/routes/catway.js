@@ -13,10 +13,10 @@ router.get('/', private.checkJWT, service.getAll);
 router.get('/:id', private.checkJWT, service.getById);
 
 // Ajouter un nouveau catway
-router.post('/', private.checkJWT, service.add);
+router.post('/',private.checkJWT, service.add);
 
 // Modifier l’état d’un catway (uniquement catwayState)
-router.put('/:id', private.checkJWT, service.updateState);
+router.put('/:id',private.checkJWT, service.updateState);
 
 // Supprimer un catway
 router.delete('/:id', private.checkJWT, service.delete);

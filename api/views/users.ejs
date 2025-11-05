@@ -114,7 +114,7 @@
         if (newName) body.username = newName;
         if (newPassword) body.password = newPassword;
 
-        const res = await fetch('/users/' + encodeURIComponent(email), {
+        const res = await fetch('api/users/' + encodeURIComponent(email), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -135,7 +135,7 @@
       if (ev.target.classList.contains('delete-btn')) {
         if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
 
-        const res = await fetch('/users/' + encodeURIComponent(email), {
+        const res = await fetch('api/users/' + encodeURIComponent(email), {
           method: 'DELETE',
           credentials: 'include'
         });
