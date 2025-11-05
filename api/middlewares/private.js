@@ -7,7 +7,7 @@ exports.checkJWT = async (req, res, next) => {
     // Lire le token depuis le header ou le cookie
     let token = req.headers['x-access-token'] 
                 || req.headers['authorization'] 
-                || req.cookies['Authorization'];
+                || req.cookies['token'];
 
     if (!!token && token.startsWith('Bearer ')) {
         token = token.slice(7, token.length);
