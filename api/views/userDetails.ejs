@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Détails de <%= viewedUser.username %></title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+  </style>
+</head>
+<body>
+  <p>Connecté : <%= user.username %> (<%= user.email %>)</p>
+  <hr>
+
+  <% if (error) { %>
+    <h2 style="color:red"><%= error %></h2>
+  <% } else { %>
+    <h1>Détails de l'utilisateur <%= viewedUser.username %></h1>
+    <ul>
+      <li><strong>Nom :</strong> <%= viewedUser.username %></li>
+      <li><strong>Email :</strong> <%= viewedUser.email %></li>
+      <li><strong>Créé le :</strong> <%= new Date(viewedUser.createdAt).toLocaleDateString('fr-FR') %></li>
+      <% if (viewedUser.updatedAt && viewedUser.updatedAt !== viewedUser.createdAt) { %>
+        <li><strong>Dernière mise à jour :</strong> <%= new Date(viewedUser.updatedAt).toLocaleDateString('fr-FR') %></li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <a href="/users">⬅ Retour à la liste</a>
+</body>
+</html>
