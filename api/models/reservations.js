@@ -31,9 +31,6 @@ const reservationSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function (value) {
-        // Laisser Mongoose gérer la validation de date de début vs aujourd'hui
-        // ou la faire dans le service pour permettre aux administrateurs de créer des réservations passées si nécessaire.
-        // Je retire temporairement la validation de date dans le futur ici pour simplifier les tests
         return true; 
       },
       message: 'La date de début doit être valide.',
