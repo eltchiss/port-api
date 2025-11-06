@@ -162,9 +162,10 @@ router.post('/catways/:id/delete', checkTokenCookie, async (req, res) => {
 });
 
 
-// GESTION DES UTILISATEURS
+// 🧩 GESTION DES UTILISATEURS
 
-// GET /users
+// === 1. Liste des utilisateurs ===
+// ⚠️ Cette route DOIT être placée AVANT celle avec /users/:email
 router.get('/users', checkTokenCookie, async (req, res) => {
   try {
     const response = await axios.get('http://localhost:3003/api/users', {
@@ -172,8 +173,8 @@ router.get('/users', checkTokenCookie, async (req, res) => {
     });
 
     res.render('users', {
-      user: req.user,
-      users: response.data,
+      user: req.user,        // utilisateur connecté
+      users: response.data,  // liste des utilisateurs
       error: null
     });
   } catch (err) {
@@ -186,7 +187,8 @@ router.get('/users', checkTokenCookie, async (req, res) => {
   }
 });
 
-// POST /users
+
+// === 2. Création d’un utilisateur ===
 router.post('/users', checkTokenCookie, async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -207,7 +209,30 @@ router.post('/users', checkTokenCookie, async (req, res) => {
   }
 });
 
-// POST /users/:email/update
+
+// === 3. Détails d’un utilisateur ===
+// ⚠️ Cette route doit venir APRÈS la route /users (sinon conflit)
+router.get('/users/:email', checkTokenCookie, async (req, res) => {
+  try {
+    const response = await axios.get(
+      `http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`,
+      { headers: { Authorization: `Bearer ${req.token}` } }
+    );
+
+    // ✅ Correction : renvoyer l’utilisateur consulté sous la clé "viewedUser"
+    res.render('userDetails', {
+      user: req.user,           // utilisateur connecté
+      viewedUser: response.data, // utilisateur dont on affiche les détails
+      error: null
+    });
+  } catch (err) {
+    console.error('Erreur détail utilisateur :', err.message);
+    res.redirect('/users');
+  }
+});
+
+
+// === 4. Mise à jour d’un utilisateur ===
 router.post('/users/:email/update', checkTokenCookie, async (req, res) => {
   try {
     await axios.put(
@@ -222,26 +247,8 @@ router.post('/users/:email/update', checkTokenCookie, async (req, res) => {
   }
 });
 
-// GET /users/:email
-router.get('/users/:email', checkTokenCookie, async (req, res) => {
-  try {
-    const response = await axios.get(
-      `http://localhost:3003/api/users/${encodeURIComponent(req.params.email)}`,
-      { headers: { Authorization: `Bearer ${req.token}` } }
-    );
 
-    res.render('userDetails', {
-      user: req.user,
-      userDetails: response.data,
-      error: null
-    });
-  } catch (err) {
-    console.error('Erreur détail utilisateur :', err.message);
-    res.redirect('/users');
-  }
-});
-
-// POST /users/:email/delete
+// === 5. Suppression d’un utilisateur ===
 router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
   try {
     await axios.delete(
@@ -254,6 +261,7 @@ router.post('/users/:email/delete', checkTokenCookie, async (req, res) => {
     res.redirect('/users');
   }
 });
+
 
 
 // GESTION DES RÉSERVATIONS

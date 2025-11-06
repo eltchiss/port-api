@@ -8,7 +8,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 1em; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background: #eee; }
-    button { cursor: pointer; }
+    button { cursor: pointer; margin: 0 2px; }
     .error { color: red; }
   </style>
 </head>
@@ -53,13 +53,13 @@
         <tr><td colspan="4">Aucun utilisateur enregistré.</td></tr>
       <% } else { %>
         <% users.forEach(u => { %>
-          <tr>
-            <td><%= u.username %></td>
-            <td><%= u.email %></td>
+          <tr data-email="<%= u.email %>">
+            <td class="username"><%= u.username %></td>
+            <td class="email"><%= u.email %></td>
             <td><%= new Date(u.createdAt).toLocaleDateString('fr-FR') %></td>
             <td>
-              <button class="update-btn" data-email="<%= u.email %>">Modifier</button>
-              <button class="delete-btn" data-email="<%= u.email %>">Supprimer</button>
+              <button class="edit-btn">Modifier</button>
+              <button class="delete-btn">Supprimer</button>
               <a href="/users/<%= u.email %>">Détails</a>
             </td>
           </tr>
@@ -93,60 +93,98 @@
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).message || 'Erreur création utilisateur';
         alert(msg);
-      } else {
-        alert('Utilisateur créé avec succès');
       }
       location.reload();
     });
 
     // === MISE À JOUR & SUPPRESSION ===
     document.addEventListener('click', async (ev) => {
-      const email = ev.target.dataset.email;
-      if (!email) return;
-
-      // --- MODIFIER ---
-      if (ev.target.classList.contains('update-btn')) {
-        const newName = prompt(`Nouveau nom pour ${email} ?`);
-        const newPassword = prompt(`Nouveau mot de passe (laisser vide pour ne pas changer) :`);
-        if (!newName && !newPassword) return;
-
-        const body = {};
-        if (newName) body.username = newName;
-        if (newPassword) body.password = newPassword;
-
-        const res = await fetch('api/users/' + encodeURIComponent(email), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-          const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour utilisateur';
-          alert(msg);
-        } else {
-          alert('Utilisateur mis à jour');
-        }
-        location.reload();
-        return;
-      }
+      const tr = ev.target.closest('tr[data-email]');
+      if (!tr) return;
+      const email = tr.dataset.email;
 
       // --- SUPPRIMER ---
       if (ev.target.classList.contains('delete-btn')) {
-        if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+        if (!confirm('Supprimer l’utilisateur ' + email + ' ?')) return;
 
-        const res = await fetch('api/users/' + encodeURIComponent(email), {
+        const res = await fetch('/api/users/' + encodeURIComponent(email), {
           method: 'DELETE',
           credentials: 'include'
         });
 
         if (!res.ok) {
-          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression utilisateur';
+          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression';
           alert(msg);
-        } else {
-          alert('Utilisateur supprimé');
         }
         location.reload();
+        return;
+      }
+
+      // --- MODIFIER (édition directe dans le tableau) ---
+      if (ev.target.classList.contains('edit-btn')) {
+        // Empêche double édition
+        if (tr.classList.contains('editing')) return;
+        tr.classList.add('editing');
+
+        // Sauvegarde des valeurs actuelles
+        const nameCell = tr.querySelector('.username');
+        const oldName = nameCell.textContent.trim();
+        const actionsCell = tr.querySelector('td:last-child');
+        const oldActions = actionsCell.innerHTML;
+
+        // Transforme la cellule en champ éditable
+        nameCell.innerHTML = `
+          <input type="text" value="${oldName}" placeholder="Nom">
+          <br>
+          <input type="password" placeholder="Nouveau mot de passe (optionnel)">
+        `;
+
+        // Boutons Sauvegarder / Annuler
+        actionsCell.innerHTML = `
+          <button class="save-btn">Sauvegarder</button>
+          <button class="cancel-btn">Annuler</button>
+        `;
+
+        // === SAUVEGARDE ===
+        actionsCell.querySelector('.save-btn').addEventListener('click', async () => {
+          const newName = nameCell.querySelector('input[type="text"]').value.trim();
+          const newPass = nameCell.querySelector('input[type="password"]').value.trim();
+
+          const body = {};
+          if (newName && newName !== oldName) body.username = newName;
+          if (newPass) body.password = newPass;
+
+          if (Object.keys(body).length === 0) {
+            alert('Aucune modification à enregistrer.');
+            return;
+          }
+
+          const res = await fetch('/api/users/' + encodeURIComponent(email), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+          });
+
+          if (!res.ok) {
+            const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour';
+            alert(msg);
+          } else {
+            alert('Utilisateur mis à jour');
+            if (body.username) nameCell.textContent = body.username;
+            else nameCell.textContent = oldName;
+          }
+
+          tr.classList.remove('editing');
+          actionsCell.innerHTML = oldActions;
+        });
+
+        // === ANNULATION ===
+        actionsCell.querySelector('.cancel-btn').addEventListener('click', () => {
+          nameCell.textContent = oldName;
+          actionsCell.innerHTML = oldActions;
+          tr.classList.remove('editing');
+        });
       }
     });
   </script>

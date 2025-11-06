@@ -8,13 +8,20 @@
     table { border-collapse: collapse; width: 100%; margin-top: 1em; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
     th { background: #eee; }
-    form.inline { display: inline; }
-    button { cursor: pointer; }
+    button { cursor: pointer; padding: 4px 8px; margin: 2px; border-radius: 4px; }
     .error { color: red; }
+
+    /* Style pour cellules éditables */
+    .editable[contenteditable="true"] {
+      background-color: #fffacd;
+      border: 1px dashed #ccc;
+    }
+
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <h1>Gestion des Catways</h1>
+  <h1>Gestion des Catways (Mode Édition Explicite)</h1>
   <p>Connecté(e) : <%= user.username %> - <%= user.email %></p>
   <a href="/dashboard">Retour au tableau de bord</a> |
   <a href="/logout">Déconnexion</a>
@@ -52,13 +59,19 @@
         <tr><td colspan="4">Aucun catway enregistré.</td></tr>
       <% } else { %>
         <% catways.forEach(cat => { %>
-          <tr>
+          <tr 
+            data-number="<%= cat.catwayNumber %>"
+            data-type-original="<%= cat.catwayType %>"
+            data-state-original="<%= cat.catwayState %>"
+          >
             <td><%= cat.catwayNumber %></td>
-            <td><%= cat.catwayType %></td>
-            <td><%= cat.catwayState %></td>
+            <td class="editable catwayType" contenteditable="false" data-field="catwayType"><%= cat.catwayType %></td>
+            <td class="editable catwayState" contenteditable="false" data-field="catwayState"><%= cat.catwayState %></td>
             <td>
-              <button class="update-btn" data-number="<%= cat.catwayNumber %>">Modifier</button>
-              <button class="delete-btn" data-number="<%= cat.catwayNumber %>">Supprimer</button>
+              <button class="toggle-edit-btn">Modifier</button>
+              <button class="save-btn hidden">Enregistrer</button>
+              <button class="cancel-btn hidden">Annuler</button>
+              <button class="delete-btn">Supprimer</button>
               <a href="/catways/<%= cat.catwayNumber %>">Détails</a>
             </td>
           </tr>
@@ -72,9 +85,39 @@
   <% } %>
 
   <script>
+    function showModal(message) {
+      alert(message);
+    }
+
+    async function handleApiError(res, defaultMsg) {
+      const status = res.status;
+      try {
+        const body = await res.json();
+        const msg = body.message || defaultMsg;
+        showModal(`Erreur (${status}) : ${msg}`);
+      } catch {
+        showModal(`Erreur critique : Statut HTTP ${status}`);
+      }
+    }
+
+    function setRowEditable(row, editable) {
+      const cells = row.querySelectorAll('.editable');
+      const toggleBtn = row.querySelector('.toggle-edit-btn');
+      const saveBtn = row.querySelector('.save-btn');
+      const cancelBtn = row.querySelector('.cancel-btn');
+
+      cells.forEach(c => c.contentEditable = editable ? "true" : "false");
+
+      toggleBtn.classList.toggle('hidden', editable);
+      saveBtn.classList.toggle('hidden', !editable);
+      cancelBtn.classList.toggle('hidden', !editable);
+
+      if (editable) row.querySelector('.editable').focus();
+    }
+
     // === CRÉATION ===
     document.getElementById('createCatwayForm').addEventListener('submit', async (e) => {
-      e.preventDefault(); 
+      e.preventDefault();
       const form = e.target;
       const data = {
         catwayNumber: Number(form.catwayNumber.value),
@@ -89,52 +132,97 @@
         body: JSON.stringify(data)
       });
 
-      if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).message || 'Erreur création';
-        alert(msg);
-      }
-      location.reload(); // recharge simplement la page
+      if (!res.ok) await handleApiError(res, 'Erreur lors de la création du catway');
+      else showModal('Catway créé avec succès');
+
+      location.reload();
     });
 
-    // === MODIFICATION & SUPPRESSION ===
-    document.addEventListener('click', async (ev) => { //Attache un seul écouteur au document pour tous les clics.
-      const number = ev.target.dataset.number;
-      if (!number) return;
+    // === GESTION DES CLICS ===
+    document.addEventListener('click', async (ev) => {
+      const target = ev.target;
+      const row = target.closest('tr');
+      if (!row) return;
 
-      // Modification
-      if (ev.target.classList.contains('update-btn')) {
-        const newState = prompt('Nouvel état pour le catway ' + number + ' ?');
-        if (!newState) return;
+      const number = row.dataset.number;
+      const originalType = row.dataset.typeOriginal;
+      const originalState = row.dataset.stateOriginal;
 
-        const res = await fetch('/api/catways/' + encodeURIComponent(number), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ catwayState: newState })
-        });
-
-        if (!res.ok) {
-          const msg = (await res.json().catch(() => ({}))).message || 'Erreur mise à jour';
-          alert(msg);
-        }
-        location.reload(); // rechargement simple
+      // --- MODIFIER ---
+      if (target.classList.contains('toggle-edit-btn')) {
+        setRowEditable(row, true);
         return;
       }
 
-      // Suppression
-      if (ev.target.classList.contains('delete-btn')) {
-        if (!confirm('Supprimer le catway ' + number + ' ?')) return;
+      // --- ANNULER ---
+      if (target.classList.contains('cancel-btn')) {
+        row.querySelector('.catwayType').innerText = originalType;
+        row.querySelector('.catwayState').innerText = originalState;
+        setRowEditable(row, false);
+        return;
+      }
 
-        const res = await fetch('/api/catways/' + encodeURIComponent(number), {
+      // --- ENREGISTRER ---
+      if (target.classList.contains('save-btn')) {
+        const typeCell = row.querySelector('.catwayType');
+        const stateCell = row.querySelector('.catwayState');
+
+        const newType = typeCell.innerText.trim();
+        const newState = stateCell.innerText.trim();
+
+        const body = {};
+        let needsUpdate = false;
+
+        if (newType !== originalType) {
+          body.catwayType = newType;
+          needsUpdate = true;
+        }
+        if (newState !== originalState) {
+          body.catwayState = newState;
+          needsUpdate = true;
+        }
+
+        if (!needsUpdate) {
+          showModal("Aucun changement détecté.");
+          setRowEditable(row, false);
+          return;
+        }
+
+        const res = await fetch(`/api/catways/${encodeURIComponent(number)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+          await handleApiError(res, 'Erreur lors de la mise à jour du catway');
+          location.reload();
+        } else {
+          showModal('Catway mis à jour avec succès.');
+          row.dataset.typeOriginal = newType;
+          row.dataset.stateOriginal = newState;
+          setRowEditable(row, false);
+        }
+        return;
+      }
+
+      // --- SUPPRIMER ---
+      if (target.classList.contains('delete-btn')) {
+        const confirmation = prompt(`Taper OUI pour supprimer le catway ${number} :`);
+        if (confirmation !== 'OUI') return;
+
+        const res = await fetch(`/api/catways/${encodeURIComponent(number)}`, {
           method: 'DELETE',
           credentials: 'include'
         });
 
         if (!res.ok) {
-          const msg = (await res.json().catch(() => ({}))).message || 'Erreur suppression';
-          alert(msg);
+          await handleApiError(res, 'Erreur lors de la suppression du catway');
+        } else {
+          showModal('Catway supprimé.');
         }
-        location.reload(); // rechargement simple
+        location.reload();
       }
     });
   </script>

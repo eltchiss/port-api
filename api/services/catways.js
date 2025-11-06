@@ -43,27 +43,41 @@ exports.add = async (req, res) => {
   }
 };
 
-// Modifier uniquement l’état d’un catway (catwayState)
+// Modifier un catway (état et/ou type)
 exports.updateState = async (req, res) => {
   try {
-    const { catwayState } = req.body;
+    const { catwayState, catwayType } = req.body;
 
-    // On ne modifie que l’état
+    // Vérifie qu’au moins un champ est fourni
+    if (!catwayState && !catwayType) {
+      return res.status(400).json({ message: 'Aucun champ à mettre à jour.' });
+    }
+
+    // Crée dynamiquement l’objet de mise à jour
+    const updateFields = {};
+    if (catwayState) updateFields.catwayState = catwayState;
+    if (catwayType) updateFields.catwayType = catwayType;
+
     const updated = await Catway.findOneAndUpdate(
       { catwayNumber: req.params.id },
-      { catwayState },
-      { new: true }
+      updateFields,
+      { new: true } // retourne le document modifié
     );
 
     if (!updated) {
       return res.status(404).json({ message: 'Catway non trouvé' });
     }
 
-    res.status(200).json(updated);
+    res.status(200).json({
+      message: 'Catway mis à jour avec succès.',
+      catway: updated
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Erreur lors de la mise à jour du catway :', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
+
 
 // Supprimer un catway
 exports.delete = async (req, res) => {
